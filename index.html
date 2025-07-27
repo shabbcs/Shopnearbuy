@@ -293,8 +293,8 @@
     const fileInput = document.getElementById("image_file");
     const file = fileInput.files[0];
 
-    if (!shop_name || !category) {
-      alert("Shop name and category are required.");
+    if (!shop_name || !file || !category) {
+      alert("Shop name, image and category are required.");
       return;
     }
 
