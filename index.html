@@ -16,15 +16,12 @@
     }
 
     header {
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-  background: linear-gradient(90deg, #3f87a6, #153B50);
-  color: white;
-  padding: 20px 15px;
-  text-align: center;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-}
+      background: linear-gradient(90deg, #3f87a6, #153B50);
+      color: white;
+      padding: 20px 15px;
+      text-align: center;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
 
     header h1 {
       margin: 0;
@@ -75,7 +72,7 @@
 
     #map {
       height: 300px;
-      margin: 0 20px 20px;
+      margin: 0 20px 10px;
       border-radius: 10px;
       overflow: hidden;
       box-shadow: 0 2px 10px rgba(0,0,0,0.05);
@@ -160,18 +157,21 @@
   <p>Find and list local shops near your location</p>
 </header>
 
-<div id="form-container">
+<div id="map"></div>
+
+<div style="text-align:center; margin: 10px 20px;">
+  <button id="toggleFormBtn" onclick="toggleForm()">➕ Add New Shop</button>
+</div>
+
+<div id="form-container" style="display:none;">
   <h2>Add New Shop</h2>
   <input type="text" id="shop_name" placeholder="Shop Name" />
   <input type="text" id="owner_name" placeholder="Owner Name" />
   <textarea id="description" placeholder="Description"></textarea>
   <input type="text" id="category" placeholder="Category" />
-  <!-- Camera-only file input -->
   <input type="file" id="image_file" accept="image/*" capture="environment" />
   <button onclick="addShop()">➕ Add Shop</button>
 </div>
-
-<div id="map"></div>
 
 <h3>Nearby Shops</h3>
 <div id="shops"></div>
@@ -217,55 +217,56 @@
     L.marker([currentCoords.lat, currentCoords.lng]).addTo(map).bindPopup("📍 You are here").openPopup();
   }
 
-
   async function loadShops() {
-  log("🔄 Loading shops from DB...");
-  const { data, error } = await supabase.from("shops").select("*").order("created_at", { ascending: false });
-  const container = document.getElementById("shops");
-  container.innerHTML = "";
+    log("🔄 Loading shops from DB...");
+    const { data, error } = await supabase.from("shops").select("*").order("created_at", { ascending: false });
+    const container = document.getElementById("shops");
+    container.innerHTML = "";
 
-  if (error) {
-    log("❌ Error loading shops: " + error.message);
-    return;
-  }
-
-  if (!data.length) {
-    container.innerHTML = "<p>No shops found.</p>";
-    return;
-  }
-
-  for (const shop of data) {
-    let imgTag = "";
-    if (shop.image_url) {
-      const { data: imgData, error: imgErr } = await supabase
-        .storage.from("shop-images")
-        .createSignedUrl(shop.image_url, 3600);
-      if (!imgErr && imgData?.signedUrl) {
-        imgTag = `<img src="${imgData.signedUrl}" alt="Shop Image">`;
-      } else {
-        log("⚠️ Signed URL error: " + (imgErr?.message || "Unknown error"));
-      }
+    if (error) {
+      log("❌ Error loading shops: " + error.message);
+      return;
     }
 
-    const directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${currentCoords.lat},${currentCoords.lng}&destination=${shop.lat},${shop.lng}`;
+    if (!data.length) {
+      container.innerHTML = "<p>No shops found.</p>";
+      document.getElementById("form-container").style.display = "block";
+      document.getElementById("toggleFormBtn").textContent = "➖ Hide Add Shop";
+      return;
+    }
 
-    container.innerHTML += `
-      <div class="shop-card">
-        ${imgTag}
-        <strong>${shop.shop_name}</strong><br/>
-        Owner: ${shop.owner_name}<br/>
-        ${shop.category}<br/>
-        <small>${shop.description}</small><br/>
-        <a href="${directionsUrl}" target="_blank">
-          <button style="background:#28a745; margin-top:10px;">📍 Get Directions</button>
-        </a>
-        <button onclick="deleteShop(${shop.id}, '${shop.image_url ?? ''}')">🗑️ Delete</button>
-      </div>
-    `;
+    for (const shop of data) {
+      let imgTag = "";
+      if (shop.image_url) {
+        const { data: imgData, error: imgErr } = await supabase
+          .storage.from("shop-images")
+          .createSignedUrl(shop.image_url, 3600);
+        if (!imgErr && imgData?.signedUrl) {
+          imgTag = `<img src="${imgData.signedUrl}" alt="Shop Image">`;
+        } else {
+          log("⚠️ Signed URL error: " + (imgErr?.message || "Unknown error"));
+        }
+      }
+
+      const directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${currentCoords.lat},${currentCoords.lng}&destination=${shop.lat},${shop.lng}`;
+
+      container.innerHTML += `
+        <div class="shop-card">
+          ${imgTag}
+          <strong>${shop.shop_name}</strong><br/>
+          Owner: ${shop.owner_name}<br/>
+          ${shop.category}<br/>
+          <small>${shop.description}</small><br/>
+          <a href="${directionsUrl}" target="_blank">
+            <button style="background:#28a745; margin-top:10px;">📍 Get Directions</button>
+          </a>
+          <button onclick="deleteShop(${shop.id}, '${shop.image_url ?? ''}')">🗑️ Delete</button>
+        </div>
+      `;
+    }
+
+    log("✅ Loaded " + data.length + " shops.");
   }
-
-  log("✅ Loaded " + data.length + " shops.");
-}
 
   async function deleteShop(id, image_url) {
     try {
@@ -296,74 +297,86 @@
   }
 
   async function addShop() {
-  const shop_name_el = document.getElementById("shop_name");
-  const owner_name_el = document.getElementById("owner_name");
-  const description_el = document.getElementById("description");
-  const category_el = document.getElementById("category");
-  const fileInput = document.getElementById("image_file");
+    const shop_name_el = document.getElementById("shop_name");
+    const owner_name_el = document.getElementById("owner_name");
+    const description_el = document.getElementById("description");
+    const category_el = document.getElementById("category");
+    const fileInput = document.getElementById("image_file");
 
-  const shop_name = shop_name_el.value.trim();
-  const owner_name = owner_name_el.value.trim();
-  const description = description_el.value.trim();
-  const category = category_el.value.trim();
-  const file = fileInput.files[0];
+    const shop_name = shop_name_el.value.trim();
+    const owner_name = owner_name_el.value.trim();
+    const description = description_el.value.trim();
+    const category = category_el.value.trim();
+    const file = fileInput.files[0];
 
-  if (!shop_name || !file || !category) {
-    alert("❗ Shop name, image and category are required.");
-    return;
-  }
-
-  let imagePath = null;
-
-  try {
-    const fileName = Date.now() + "_" + file.name.replace(/\s/g, "_");
-    const fullPath = "Test/" + fileName;
-
-    const { data, error } = await supabase
-      .storage.from("shop-images")
-      .upload(fullPath, file, { upsert: false });
-
-    if (error) {
-      log("❌ Upload Error: " + error.message);
-      alert("Image upload failed: " + error.message);
+    if (!shop_name || !file || !category) {
+      alert("❗ Shop name, image and category are required.");
       return;
     }
 
-    imagePath = data.path;
-    log("🟢 Image uploaded: " + imagePath);
+    let imagePath = null;
 
-    const { error: insertError } = await supabase.from("shops").insert({
-      shop_name,
-      owner_name,
-      description,
-      category,
-      lat: currentCoords.lat,
-      lng: currentCoords.lng,
-      image_url: imagePath
-    });
+    try {
+      const fileName = Date.now() + "_" + file.name.replace(/\s/g, "_");
+      const fullPath = "Test/" + fileName;
 
-    if (insertError) {
-      log("❌ Insert Error: " + insertError.message);
-      alert("Shop insert failed: " + insertError.message);
-    } else {
-      log("✅ Shop added successfully.");
-      alert("✅ Shop added successfully!");
+      const { data, error } = await supabase
+        .storage.from("shop-images")
+        .upload(fullPath, file, { upsert: false });
 
-      // ✅ Clear the form fields manually
-      shop_name_el.value = "";
-      owner_name_el.value = "";
-      description_el.value = "";
-      category_el.value = "";
-      fileInput.value = "";
+      if (error) {
+        log("❌ Upload Error: " + error.message);
+        alert("Image upload failed: " + error.message);
+        return;
+      }
 
-      log("✅ Fields cleared.");
-      await loadShops();
+      imagePath = data.path;
+      log("🟢 Image uploaded: " + imagePath);
+
+      const { error: insertError } = await supabase.from("shops").insert({
+        shop_name,
+        owner_name,
+        description,
+        category,
+        lat: currentCoords.lat,
+        lng: currentCoords.lng,
+        image_url: imagePath
+      });
+
+      if (insertError) {
+        log("❌ Insert Error: " + insertError.message);
+        alert("Shop insert failed: " + insertError.message);
+      } else {
+        log("✅ Shop added successfully.");
+        alert("✅ Shop added successfully!");
+
+        shop_name_el.value = "";
+        owner_name_el.value = "";
+        description_el.value = "";
+        category_el.value = "";
+        fileInput.value = "";
+
+        log("✅ Fields cleared.");
+        await loadShops();
+      }
+    } catch (err) {
+      log("❌ JS Error: " + err.message);
+      alert("Unexpected error: " + err.message);
     }
-  } catch (err) {
-    log("❌ JS Error: " + err.message);
-    alert("Unexpected error: " + err.message);
   }
-}
+
+  function toggleForm() {
+    const form = document.getElementById("form-container");
+    const btn = document.getElementById("toggleFormBtn");
+    if (form.style.display === "none") {
+      form.style.display = "block";
+      btn.textContent = "➖ Hide Add Shop";
+    } else {
+      form.style.display = "none";
+      btn.textContent = "➕ Add New Shop";
+    }
+  }
+
   getLocationAndLoad();
 </script>
 </body>
