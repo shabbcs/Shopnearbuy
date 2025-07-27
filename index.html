@@ -214,48 +214,55 @@
     L.marker([currentCoords.lat, currentCoords.lng]).addTo(map).bindPopup("📍 You are here").openPopup();
   }
 
+
   async function loadShops() {
-    log("🔄 Loading shops from DB...");
-    const { data, error } = await supabase.from("shops").select("*").order("created_at", { ascending: false });
-    const container = document.getElementById("shops");
-    container.innerHTML = "";
+  log("🔄 Loading shops from DB...");
+  const { data, error } = await supabase.from("shops").select("*").order("created_at", { ascending: false });
+  const container = document.getElementById("shops");
+  container.innerHTML = "";
 
-    if (error) {
-      log("❌ Error loading shops: " + error.message);
-      return;
-    }
-
-    if (!data.length) {
-      container.innerHTML = "<p>No shops found.</p>";
-      return;
-    }
-
-    for (const shop of data) {
-      let imgTag = "";
-      if (shop.image_url) {
-        const { data: imgData, error: imgErr } = await supabase
-          .storage.from("shop-images")
-          .createSignedUrl(shop.image_url, 3600);
-        if (!imgErr && imgData?.signedUrl) {
-          imgTag = `<img src="${imgData.signedUrl}" alt="Shop Image">`;
-        } else {
-          log("⚠️ Signed URL error: " + (imgErr?.message || "Unknown error"));
-        }
-      }
-
-      container.innerHTML += `
-        <div class="shop-card">
-          ${imgTag}
-          <strong>${shop.shop_name}</strong><br/>
-          Owner: ${shop.owner_name}<br/>
-          ${shop.category}<br/>
-          <small>${shop.description}</small><br/>
-          <button onclick="deleteShop(${shop.id}, '${shop.image_url ?? ''}')">🗑️ Delete</button>
-        </div>
-      `;
-    }
-    log("✅ Loaded " + data.length + " shops.");
+  if (error) {
+    log("❌ Error loading shops: " + error.message);
+    return;
   }
+
+  if (!data.length) {
+    container.innerHTML = "<p>No shops found.</p>";
+    return;
+  }
+
+  for (const shop of data) {
+    let imgTag = "";
+    if (shop.image_url) {
+      const { data: imgData, error: imgErr } = await supabase
+        .storage.from("shop-images")
+        .createSignedUrl(shop.image_url, 3600);
+      if (!imgErr && imgData?.signedUrl) {
+        imgTag = `<img src="${imgData.signedUrl}" alt="Shop Image">`;
+      } else {
+        log("⚠️ Signed URL error: " + (imgErr?.message || "Unknown error"));
+      }
+    }
+
+    const directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${currentCoords.lat},${currentCoords.lng}&destination=${shop.lat},${shop.lng}`;
+
+    container.innerHTML += `
+      <div class="shop-card">
+        ${imgTag}
+        <strong>${shop.shop_name}</strong><br/>
+        Owner: ${shop.owner_name}<br/>
+        ${shop.category}<br/>
+        <small>${shop.description}</small><br/>
+        <a href="${directionsUrl}" target="_blank">
+          <button style="background:#28a745; margin-top:10px;">📍 Get Directions</button>
+        </a>
+        <button onclick="deleteShop(${shop.id}, '${shop.image_url ?? ''}')">🗑️ Delete</button>
+      </div>
+    `;
+  }
+
+  log("✅ Loaded " + data.length + " shops.");
+}
 
   async function deleteShop(id, image_url) {
     try {
