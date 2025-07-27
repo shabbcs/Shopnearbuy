@@ -2,90 +2,268 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Shop Insert + Fetch</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <title>ShopNearBuy</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
     body {
+      margin: 0;
       font-family: Arial, sans-serif;
-      padding: 20px;
+      background: #f0f0f0;
     }
-    input, textarea {
+
+    h1 {
+      text-align: center;
+      background: #4CAF50;
+      color: white;
+      margin: 0;
+      padding: 10px;
+    }
+
+    #map {
+      height: 300px;
+      width: 100%;
+    }
+
+    .controls {
+      position: relative;
+      margin: 10px;
+    }
+
+    #search {
+      width: 100%;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+
+    #addBtn {
+      position: absolute;
+      top: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #4CAF50;
+      color: white;
+      font-size: 30px;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 60px;
+      cursor: pointer;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+      z-index: 999;
+    }
+
+    #addForm {
+      display: none;
+      padding: 15px;
+      background: white;
+      margin: 10px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    #addForm input, #addForm select, #addForm textarea {
       display: block;
+      width: 100%;
       margin-bottom: 10px;
       padding: 8px;
-      width: 300px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
     }
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
+
+    #addForm button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px;
+      width: 100%;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .preview {
+      width: 100%;
+      border-radius: 10px;
+      margin-top: 10px;
+    }
+
+    #shopsList {
+      padding: 10px;
+    }
+
+    .shopCard {
+      background: white;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
   </style>
 </head>
 <body>
-  <h2>Add New Shop</h2>
-  <input type="text" id="shop_name" placeholder="Shop Name" required />
-  <input type="text" id="owner_name" placeholder="Owner Name" />
-  <textarea id="description" placeholder="Description"></textarea>
-  <input type="text" id="category" placeholder="Category" />
-  <button onclick="insertShop()">Add Shop</button>
+  <h1>ShopNearBuy</h1>
+  <div id="map"></div>
 
-  <h2>Shop List</h2>
-  <ul id="shop-list"></ul>
+  <div class="controls">
+    <input type="text" id="search" placeholder="Search by name or category..." />
+    <div id="addBtn">➕</div>
+  </div>
 
+  <div id="addForm">
+    <input type="text" id="shopName" placeholder="Shop Name" required />
+    <input type="text" id="ownerName" placeholder="Owner Name" required />
+    <select id="shopCategory">
+      <option value="">Select Category</option>
+      <option>Grocery</option>
+      <option>Restaurant</option>
+      <option>Salon</option>
+      <option>Medical</option>
+      <option>Electronics</option>
+      <option>Other</option>
+    </select>
+    <textarea id="description" placeholder="Shop Description" required></textarea>
+    <video id="camera" autoplay playsinline width="100%" style="max-height: 200px; border-radius: 10px;"></video>
+    <button type="button" onclick="capturePhoto()">📸 Capture Photo</button>
+    <canvas id="canvas" style="display: none;"></canvas>
+    <img id="preview" class="preview" alt="Captured image" />
+    <input type="text" id="contact" placeholder="Contact Number (optional)" />
+    <button onclick="saveShop()">Save Shop</button>
+  </div>
+
+  <div id="shopsList"></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
   <script>
-    const SUPABASE_URL = 'https://jhedjiolhqdxmqjknipz.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpoZWRqaW9saHFkeG1xamtuaXB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM1MzUzMjcsImV4cCI6MjA2OTExMTMyN30.z5aYCuIHuUb_GXqbGO8rMki-36f7SYT0PVAUeMvcS0Q';
+    document.addEventListener("DOMContentLoaded", () => {
+      const map = L.map('map').setView([20.5937, 78.9629], 5);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+      }).addTo(map);
 
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    async function fetchShops() {
-      const { data, error } = await supabase.from('shops').select('*');
-      const shopList = document.getElementById('shop-list');
-      shopList.innerHTML = '';
-
-      if (error) {
-        alert('❌ Error fetching shops: ' + error.message);
-        return;
-      }
-
-      data.forEach(shop => {
-        const li = document.createElement('li');
-        li.textContent = `${shop.shop_name} (${shop.owner_name})`;
-        shopList.appendChild(li);
+      navigator.geolocation.getCurrentPosition(pos => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        map.setView([lat, lng], 15);
+        L.marker([lat, lng]).addTo(map).bindPopup("You are here").openPopup();
       });
-    }
 
-    async function insertShop() {
-      const shop_name = document.getElementById('shop_name').value;
-      const owner_name = document.getElementById('owner_name').value;
-      const description = document.getElementById('description').value;
-      const category = document.getElementById('category').value;
+      const supabase = supabase.createClient(
+        'https://jhedjiolhqdxmqjknipz.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpoZWRqaW9saHFkeG1xamtuaXB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM1MzUzMjcsImV4cCI6MjA2OTExMTMyN30.z5aYCuIHuUb_GXqbGO8rMki-36f7SYT0PVAUeMvcS0Q'
+      );
 
-      if (!shop_name) {
-        alert('⚠️ Shop Name is required!');
-        return;
+      const camera = document.getElementById('camera');
+      const canvas = document.getElementById('canvas');
+      const preview = document.getElementById('preview');
+
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => camera.srcObject = stream)
+        .catch(() => console.warn("Camera not accessible"));
+
+      const addBtn = document.getElementById('addBtn');
+      const addForm = document.getElementById('addForm');
+
+      addBtn.addEventListener('click', () => {
+        addForm.style.display = addForm.style.display === 'none' || addForm.style.display === '' ? 'block' : 'none';
+      });
+
+      window.capturePhoto = function () {
+        canvas.width = camera.videoWidth;
+        canvas.height = camera.videoHeight;
+        canvas.getContext('2d').drawImage(camera, 0, 0);
+        preview.src = canvas.toDataURL('image/png');
+      };
+
+      window.saveShop = async function () {
+        const shopName = document.getElementById('shopName').value;
+        const ownerName = document.getElementById('ownerName').value;
+        const category = document.getElementById('shopCategory').value;
+        const description = document.getElementById('description').value;
+        const contact = document.getElementById('contact').value;
+
+        const imageDataURL = canvas.toDataURL('image/png');
+        const blob = await (await fetch(imageDataURL)).blob();
+        const fileName = `shop_${Date.now()}.png`;
+
+        try {
+          const { data: uploadData, error: uploadError } = await supabase
+            .storage
+            .from('shop-images')
+            .upload(fileName, blob, {
+              contentType: 'image/png',
+            });
+
+          if (uploadError) {
+            throw uploadError;
+          }
+
+          const { data: publicUrlData } = supabase
+            .storage
+            .from('shop-images')
+            .getPublicUrl(fileName);
+
+          const imageUrl = publicUrlData.publicUrl;
+
+          navigator.geolocation.getCurrentPosition(async pos => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+
+            const { data, error } = await supabase.from('shops').insert([{
+              shop_name: shopName,
+              owner_name: ownerName,
+              category,
+              description,
+              contact,
+              lat,
+              lng,
+              image_url: imageUrl
+            }]);
+
+            if (error) throw error;
+            alert("Shop saved!");
+            location.reload();
+          });
+
+        } catch (e) {
+          console.error("Save error:", e.message);
+          alert("Failed to save shop.");
+        }
+      };
+
+      async function fetchShops() {
+        try {
+          const { data: shops, error } = await supabase.from('shops').select('*');
+          if (error) throw error;
+
+          shops.forEach(shop => {
+            if (shop.lat && shop.lng) {
+              L.marker([shop.lat, shop.lng])
+                .addTo(map)
+                .bindPopup(`<b>${shop.shop_name}</b><br>${shop.category}<br>${shop.contact || ''}`);
+            }
+
+            document.getElementById('shopsList').innerHTML += `
+              <div class="shopCard">
+                <h3>${shop.shop_name}</h3>
+                <p><b>Owner:</b> ${shop.owner_name}</p>
+                <p><b>Category:</b> ${shop.category}</p>
+                <p>${shop.description}</p>
+                ${shop.contact ? `<p><b>Contact:</b> ${shop.contact}</p>` : ""}
+                ${shop.image_url ? `<img src="${shop.image_url}" class="preview"/>` : ""}
+              </div>
+            `;
+          });
+
+        } catch (e) {
+          console.warn("DB fetch failed:", e.message);
+          document.getElementById('shopsList').innerHTML = `<p style="color:red;">Failed to load shops.</p>`;
+        }
       }
 
-      const { data, error } = await supabase.from('shops').insert([
-        { shop_name, owner_name, description, category }
-      ]);
-
-      if (error) {
-        alert('❌ Insert failed: ' + error.message);
-        return;
-      }
-
-      alert('✅ Shop added!');
-      document.getElementById('shop_name').value = '';
-      document.getElementById('owner_name').value = '';
-      document.getElementById('description').value = '';
-      document.getElementById('category').value = '';
-
-      fetchShops(); // Refresh list
-    }
-
-    // Load shops on page load
-    fetchShops();
+      fetchShops();
+    });
   </script>
 </body>
 </html>
