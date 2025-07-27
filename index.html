@@ -293,35 +293,41 @@
   }
 
   async function addShop() {
-    const shop_name = document.getElementById("shop_name").value.trim();
-    const owner_name = document.getElementById("owner_name").value.trim();
-    const description = document.getElementById("description").value.trim();
-    const category = document.getElementById("category").value.trim();
-    const fileInput = document.getElementById("image_file");
-    const file = fileInput.files[0];
+  const shop_name_el = document.getElementById("shop_name");
+  const owner_name_el = document.getElementById("owner_name");
+  const description_el = document.getElementById("description");
+  const category_el = document.getElementById("category");
+  const fileInput = document.getElementById("image_file");
 
-    if (!shop_name || !file || !category) {
-      alert("Shop name, image and category are required.");
+  const shop_name = shop_name_el.value.trim();
+  const owner_name = owner_name_el.value.trim();
+  const description = description_el.value.trim();
+  const category = category_el.value.trim();
+  const file = fileInput.files[0];
+
+  if (!shop_name || !file || !category) {
+    alert("❗ Shop name, image and category are required.");
+    return;
+  }
+
+  let imagePath = null;
+
+  try {
+    const fileName = Date.now() + "_" + file.name.replace(/\s/g, "_");
+    const fullPath = "Test/" + fileName;
+
+    const { data, error } = await supabase
+      .storage.from("shop-images")
+      .upload(fullPath, file, { upsert: false });
+
+    if (error) {
+      log("❌ Upload Error: " + error.message);
+      alert("Image upload failed: " + error.message);
       return;
     }
 
-    let imagePath = null;
-
-    if (file) {
-      const fileName = Date.now() + "_" + file.name.replace(/\s/g, "_");
-      const fullPath = "Test/" + fileName;
-
-      const { data, error } = await supabase
-        .storage.from("shop-images")
-        .upload(fullPath, file, { upsert: false });
-
-      if (error) {
-        log("❌ Upload Error: " + error.message);
-        return;
-      }
-      imagePath = data.path;
-      log("🟢 Image uploaded: " + imagePath);
-    }
+    imagePath = data.path;
+    log("🟢 Image uploaded: " + imagePath);
 
     const { error: insertError } = await supabase.from("shops").insert({
       shop_name,
@@ -335,15 +341,26 @@
 
     if (insertError) {
       log("❌ Insert Error: " + insertError.message);
+      alert("Shop insert failed: " + insertError.message);
     } else {
       log("✅ Shop added successfully.");
-      document.getElementById("shopForm").reset();
-    imageFile = null;
-    log("✅ Fields cleared.");
+      alert("✅ Shop added successfully!");
+
+      // ✅ Clear the form fields manually
+      shop_name_el.value = "";
+      owner_name_el.value = "";
+      description_el.value = "";
+      category_el.value = "";
+      fileInput.value = "";
+
+      log("✅ Fields cleared.");
       await loadShops();
     }
+  } catch (err) {
+    log("❌ JS Error: " + err.message);
+    alert("Unexpected error: " + err.message);
   }
-
+}
   getLocationAndLoad();
 </script>
 </body>
