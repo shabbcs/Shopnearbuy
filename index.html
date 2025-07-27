@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Shop Insert + Fetch</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    input, textarea {
+      display: block;
+      margin-bottom: 10px;
+      padding: 8px;
+      width: 300px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Add New Shop</h2>
+  <input type="text" id="shop_name" placeholder="Shop Name" required />
+  <input type="text" id="owner_name" placeholder="Owner Name" />
+  <textarea id="description" placeholder="Description"></textarea>
+  <input type="text" id="category" placeholder="Category" />
+  <button onclick="insertShop()">Add Shop</button>
+
+  <h2>Shop List</h2>
+  <ul id="shop-list"></ul>
+
+  <script>
+    const SUPABASE_URL = 'https://jhedjiolhqdxmqjknipz.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpoZWRqaW9saHFkeG1xamtuaXB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM1MzUzMjcsImV4cCI6MjA2OTExMTMyN30.z5aYCuIHuUb_GXqbGO8rMki-36f7SYT0PVAUeMvcS0Q';
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    async function fetchShops() {
+      const { data, error } = await supabase.from('shops').select('*');
+      const shopList = document.getElementById('shop-list');
+      shopList.innerHTML = '';
+
+      if (error) {
+        alert('❌ Error fetching shops: ' + error.message);
+        return;
+      }
+
+      data.forEach(shop => {
+        const li = document.createElement('li');
+        li.textContent = `${shop.shop_name} (${shop.owner_name})`;
+        shopList.appendChild(li);
+      });
+    }
+
+    async function insertShop() {
+      const shop_name = document.getElementById('shop_name').value;
+      const owner_name = document.getElementById('owner_name').value;
+      const description = document.getElementById('description').value;
+      const category = document.getElementById('category').value;
+
+      if (!shop_name) {
+        alert('⚠️ Shop Name is required!');
+        return;
+      }
+
+      const { data, error } = await supabase.from('shops').insert([
+        { shop_name, owner_name, description, category }
+      ]);
+
+      if (error) {
+        alert('❌ Insert failed: ' + error.message);
+        return;
+      }
+
+      alert('✅ Shop added!');
+      document.getElementById('shop_name').value = '';
+      document.getElementById('owner_name').value = '';
+      document.getElementById('description').value = '';
+      document.getElementById('category').value = '';
+
+      fetchShops(); // Refresh list
+    }
+
+    // Load shops on page load
+    fetchShops();
+  </script>
+</body>
+</html>
